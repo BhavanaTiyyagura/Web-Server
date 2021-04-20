@@ -6,55 +6,86 @@
 #include <unistd.h>
 
 
-void response_generator(char* path,char buffer[3000],char* header_buffer)
+char* response_generator(char* path)
 {
 	FILE* fp;
 	long numbytes;
-	char* final_path = (char*)malloc(sizeof(path)+1);
+	
+	char* final_path = (char*)malloc(sizeof(char)*(strlen(path)+2));
 	final_path[0] = '.';
 	strcat(final_path,path);
+	
 	char size[5];
+	char* buffer_data=NULL; 
+	long int len;
+	long int size_of_message;
+	
+	char* message = (char*)malloc(sizeof(char)*100);
 	
 	fp =  fopen(final_path,"r");
 	
-	if (path == NULL) {
-        strcpy (header_buffer, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nContent-Type: text/html\r\n");
-        exit(EXIT_FAILURE);
-    }
+	if (path == NULL) 
+	{
+	size_of_message = strlen("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nContent-Type: text/html\r\n") + 1;
+	message = (char*)realloc(message,sizeof(char)*(size_of_message));
+        strcpy (message, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nContent-Type: text/html\r\n");
+        return message;
+    	}
 	
 	if (!fp) 
 	{
+	size_of_message = strlen("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nContent-Type: text/html\r\n") + 1;
+	message = (char*)realloc(message,sizeof(char)*(size_of_message));
     	perror("Failed to open text file\n");
-    	strcpy (header_buffer, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nContent-Type: text/html\r\n");
-    	exit(EXIT_FAILURE);
-	}
-	
+    	strcpy (message, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nContent-Type: text/html\r\n");
+    	return message;
+    	}
+    	
+    	size_of_message = strlen("HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: ") + 1;
+    	message = (char*)realloc(message,sizeof(char)*(size_of_message));
+    	strcpy(message,"HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: ");
+	 
 	fseek(fp,0L,SEEK_END);
 	numbytes = ftell(fp);
 	
 	fseek(fp,0L,SEEK_SET);
 	
-	fread(buffer,sizeof(char),numbytes,fp);
-	 
-	fclose(fp);
+	buffer_data = (char*)malloc(sizeof(char)*(numbytes+1));
+	fread(buffer_data,sizeof(char),numbytes,fp);
 	
-	free(final_path);
+	buffer_data[numbytes+1]='\0';
+	
+	fclose(fp);
 	
 	sprintf(size,"%ld",numbytes);
 	
-	strcat(header_buffer,size);
-	strcat(header_buffer, "\r\n");
-	strcat(header_buffer,buffer); 
+	len = size_of_message + strlen(size) + strlen(buffer_data) + 3;
+	
+	message = (char*)realloc(message,sizeof(char)*(len));
+	
+	//form the final message
+	strcat(message,size);
+	strcat(message,"\n\n");
+	strcat(message,buffer_data);
+	
+	//add the null terminator
+	message[len-1] = 0;
+	 
+	free(buffer_data);
+	
+	free(final_path);
+	
+	return message;
 	
 	
 }
 
- void process_request(char buffer[3000],char* header_buffer)
+ char* process_request(char buffer[30000])
 {	
-	 
 	const char *end_of_method = strchr(buffer,' ');
 	const char *start_of_the_query = strchr(end_of_method+1,' ');
-	 
+	char* response = NULL;
+	
 	char method[end_of_method - buffer];
 	char path[start_of_the_query - end_of_method -1];
 	
@@ -73,8 +104,8 @@ void response_generator(char* path,char buffer[3000],char* header_buffer)
 		exit(EXIT_FAILURE);
 	}
 	
-	
-	response_generator(path,header_buffer,buffer);
+	response = response_generator(path);
+	return response;
 					
 }
 
@@ -85,12 +116,12 @@ int main(int argc, char const *argv[])
 	struct sockaddr_in address;
 	int size = sizeof(address);
 	
-	int new_socket;
+	int new_socket,len;
 	long valread;
 	
 	memset((char*)&address,0,size);
 	
-	char message[100] = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: ";
+	char* post_message = NULL;
 	
 	//network is big endian and the host can be either. htons() converts host to network 
 	
@@ -138,13 +169,17 @@ int main(int argc, char const *argv[])
 	
 	char buffer[30000] = {0};
 	valread = read(new_socket,buffer,30000);
-	
-	printf("\n%s\n",buffer);
-	
 
-	process_request(buffer,message);
+	post_message = process_request(buffer);
 	
-	write(new_socket,message,strlen(message));
+	len = strlen(post_message + 1);
+	
+	post_message = (char*)realloc(post_message,sizeof(char)*(len));
+	
+	write(new_socket,post_message,strlen(post_message));
+	
+	free(post_message);
+	
 	printf("-----SERVER SENT A MESSAGE-----");
 	
 	close(new_socket);
@@ -153,4 +188,3 @@ int main(int argc, char const *argv[])
 	
 	return 0;
 }
-

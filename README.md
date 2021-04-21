@@ -5,7 +5,7 @@ We will write a simple web server that returns files on a certain endpoint.
 * Any URL should map to the current `src` directory and files that lie within. For example:
 
   ```
-  http://localhost:3490/index.html
+  http://localhost:8080/index.html
   ```
 
   should serve the file

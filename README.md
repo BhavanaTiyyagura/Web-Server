@@ -1,6 +1,6 @@
 # A Simple Web Server in C 
 
-We will write a simple web server that returns files on a certain endpoint.
+A simple web server that returns files on a certain endpoint.
 
 * Any URL should map to the current `src` directory and files that lie within. For example:
 
